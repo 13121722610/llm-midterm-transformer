@@ -1,7 +1,7 @@
 # src/generate.py
 import torch
-from src.data import load_data
-from src.model import DecoderOnlyTransformer
+from data import load_data
+from model import DecoderOnlyTransformer
 
 def generate(model, tokenizer, prompt, max_new_tokens=200, temperature=1.0):
     model.eval()
