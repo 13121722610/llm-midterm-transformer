@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from src.data import load_data
-from src.model import DecoderOnlyTransformer
+from data import load_data
+from model import DecoderOnlyTransformer
 
 class CharDataset(Dataset):
     def __init__(self, data, block_size):
