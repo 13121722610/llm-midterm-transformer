@@ -16,8 +16,9 @@ def generate_full_transformer(model, tokenizer, prompt, max_new_tokens=200, temp
         idx_cond = idx if idx.size(1) <= model.encoder.max_seq_len else idx[:, -model.encoder.max_seq_len:]
         
         # 使用相同的输入作为encoder和decoder的输入
+        # 注意：这里我们使用完整的序列作为输入
         logits = model(idx_cond, idx_cond)
-        logits = logits[:, -1, :] / temperature
+        logits = logits[:, -1, :] / temperature  # 只取最后一个时间步
         probs = torch.softmax(logits, dim=-1)
         next_id = torch.multinomial(probs, num_samples=1)
         idx = torch.cat([idx, next_id], dim=1)
