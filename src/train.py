@@ -102,13 +102,13 @@ def train_transformer(model_type='full'):
     ensure_directories()
     
     # 超参数
-    d_model = 128
-    n_layer = 4
-    n_head = 4
-    d_ff = 512
-    block_size = 128
-    batch_size = 32
-    epochs = 20
+    d_model = 64         # 减少模型维度
+    n_layer = 2          # 减少层数
+    n_head = 2           # 减少注意力头数
+    d_ff = 256           # 减少前馈网络维度
+    block_size = 64      # 减少序列长度
+    batch_size = 16      # 减少批大小
+    epochs = 5           # 减少训练轮数
     lr = 3e-4
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
