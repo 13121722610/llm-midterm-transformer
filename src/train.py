@@ -169,13 +169,15 @@ def train_transformer(model_type='full'):
             xb, yb = xb.to(device), yb.to(device)
             
             if model_type == 'full':
-                # 对于完整Transformer，使用encoder-decoder结构
-                logits = model(xb[:, :-1], xb[:, :-1])  # 使用相同的输入作为src和tgt
+                # 修复：对于完整Transformer，正确处理输入输出对齐
+                # 输入：xb[:, :-1] (去掉最后一个token)
+                # 目标：yb[:, :-1] (去掉第一个token，与输入对齐)
+                logits = model(xb[:, :-1], xb[:, :-1])  # (B, T-1, V)
+                loss = criterion(logits.view(-1, logits.size(-1)), yb[:, :-1].contiguous().view(-1))
             else:
                 # 对于decoder-only，直接处理
-                logits = model(xb)
-            
-            loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
+                logits = model(xb)  # (B, T, V)
+                loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
             
             optimizer.zero_grad()
             loss.backward()
@@ -199,10 +201,11 @@ def train_transformer(model_type='full'):
                 
                 if model_type == 'full':
                     logits = model(xb[:, :-1], xb[:, :-1])
+                    loss = criterion(logits.view(-1, logits.size(-1)), yb[:, :-1].contiguous().view(-1))
                 else:
                     logits = model(xb)
+                    loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
                 
-                loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
                 total_val_loss += loss.item()
 
         avg_val_loss = total_val_loss / len(val_loader)
