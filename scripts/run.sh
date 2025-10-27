@@ -101,7 +101,7 @@ echo ""
 echo "=== 步骤5: 文本生成测试 ==="
 
 # 检查模型文件
-if [ -f "$PROJECT_DIR/checkpoints/best.pt" ]; then
+if [ -f "$PROJECT_DIR/src/checkpoints/best.pt" ]; then
     echo "找到训练好的模型，开始生成测试..."
     
     # 测试不同的prompt
