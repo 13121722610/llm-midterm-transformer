@@ -86,6 +86,7 @@ cd "$PYTHON_PATH"
 echo "GPU状态:"
 python -c "import torch; cuda_available = torch.cuda.is_available(); print(f'CUDA可用: {cuda_available}'); device_name = torch.cuda.get_device_name(0) if cuda_available else 'CPU'; print(f'GPU设备: {device_name}')"
 
+
 # 检查是否已有训练好的模型
 if [ -f "$PROJECT_DIR/checkpoints/best.pt" ]; then
     echo "✅ 发现已训练的模型: $PROJECT_DIR/checkpoints/best.pt"
