@@ -82,10 +82,18 @@ echo "=== 步骤4: 模型训练 ==="
 
 cd "$PYTHON_PATH"
 
-# 修复GPU检查的语法错误
+# 正确的GPU检查（修复了语法错误）
 echo "GPU状态:"
-python -c "import torch; cuda_available = torch.cuda.is_available(); print(f'CUDA可用: {cuda_available}'); device_name = torch.cuda.get_device_name(0) if cuda_available else 'CPU'; print(f'GPU设备: {device_name}')"
-
+python -c "\
+import torch; \
+cuda_available = torch.cuda.is_available(); \
+print(f'CUDA可用: {cuda_available}'); \
+if cuda_available: \
+    device_name = torch.cuda.get_device_name(0); \
+    print(f'GPU设备: {device_name}'); \
+else: \
+    print('GPU设备: CPU'); \
+"
 
 # 检查是否已有训练好的模型
 if [ -f "$PROJECT_DIR/checkpoints/best.pt" ]; then
