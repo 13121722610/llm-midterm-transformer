@@ -87,8 +87,8 @@ echo "GPU状态:"
 python -c "import torch; print(f'CUDA可用: {torch.cuda.is_available()}'); print(f'GPU设备: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"}')"
 
 # 检查是否已有训练好的模型
-if [ -f "$PROJECT_DIR/checkpoints/best.pt" ]; then
-    echo "✅ 发现已训练的模型: $PROJECT_DIR/checkpoints/best.pt"
+if [ -f "$PROJECT_DIR/src/checkpoints/best.pt" ]; then
+    echo "✅ 发现已训练的模型: $PROJECT_DIR/src/checkpoints/best.pt"
     echo "跳过训练步骤，直接进行文本生成..."
 else
     echo "开始训练Transformer模型..."
