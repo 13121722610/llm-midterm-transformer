@@ -78,9 +78,58 @@ echo "Python路径: $PYTHONPATH"
 echo "随机种子: $SEED"
 echo "实验模式: $EXPERIMENT_MODE"
 
+# ============================ 训练前检查 ============================
+echo ""
+echo "=== 步骤4: 训练状态检查 ==="
+
+TRAINING_NEEDED=true
+
+# 检查是否已经训练完成
+check_training_complete() {
+    if [ -f "$PROJECT_DIR/src/results/tables/ablation_study.csv" ] || [ -f "$PROJECT_DIR/results/tables/ablation_study.csv" ]; then
+        echo "✅ 发现已完成的训练结果！"
+        echo "当前训练状态:"
+        
+        if [ -f "$PROJECT_DIR/src/results/tables/ablation_study.csv" ]; then
+            RESULTS_DIR="$PROJECT_DIR/src/results"
+        else
+            RESULTS_DIR="$PROJECT_DIR/results"
+        fi
+        
+        python -c "
+import pandas as pd
+try:
+    df = pd.read_csv('$RESULTS_DIR/tables/ablation_study.csv')
+    full_ppl = df[df['model_type']=='full']['best_val_ppl'].values[0]
+    decoder_ppl = df[df['model_type']=='decoder_only']['best_val_ppl'].values[0]
+    improvement = (decoder_ppl - full_ppl) / decoder_ppl * 100
+    print('📊 现有训练结果:')
+    print(f'   完整Transformer - 困惑度: {full_ppl:.3f}')
+    print(f'   Decoder-Only - 困惑度: {decoder_ppl:.3f}')
+    print(f'   🎯 性能提升: {improvement:.1f}%')
+    print('')
+    print('💡 提示: 训练已完成，跳过训练步骤')
+except Exception as e:
+    print('读取训练结果时出错:', e)
+"
+        return 0  # 训练已完成
+    else
+        echo "❌ 未找到完整的训练结果"
+        return 1  # 需要训练
+    fi
+}
+
+# 执行训练检查
+if check_training_complete; then
+    TRAINING_NEEDED=false
+    echo "跳过训练步骤，直接进行结果展示..."
+else
+    echo "开始新的训练..."
+fi
+
 # ============================ 数据准备 ============================
 echo ""
-echo "=== 步骤4: 数据准备 ==="
+echo "=== 步骤5: 数据准备 ==="
 
 cd "$PROJECT_DIR"
 
@@ -98,13 +147,14 @@ print(f'验证数据长度: {len(val_data)}')
 
 # ============================ 模型训练 ============================
 echo ""
-echo "=== 步骤5: 模型训练 ==="
+echo "=== 步骤6: 模型训练 ==="
 
-cd "$PROJECT_DIR/src"
+if [ "$TRAINING_NEEDED" = true ]; then
+    cd "$PROJECT_DIR/src"
 
-# 正确的GPU检查 - 修复转义问题
-echo "GPU状态:"
-python -c "
+    # 正确的GPU检查
+    echo "GPU状态:"
+    python -c "
 import torch
 if torch.cuda.is_available():
     print(f'CUDA可用: True')
@@ -114,48 +164,58 @@ else:
     print(f'GPU设备: CPU')
 "
 
-# 根据模式选择训练方式
-case $EXPERIMENT_MODE in
-    "ablation")
-        echo "开始消融实验（完整Transformer vs Decoder-Only）..."
-        echo "这将需要一些时间，请耐心等待..."
-        python train.py ablation
-        ;;
-    "full")
-        echo "开始训练完整Transformer模型..."
-        python train.py full
-        ;;
-    "decoder_only")
-        echo "开始训练Decoder-Only模型..."
-        python train.py decoder_only
-        ;;
-    *)
-        echo "未知模式: $EXPERIMENT_MODE，使用默认消融实验"
-        python train.py ablation
-        ;;
-esac
+    # 根据模式选择训练方式
+    case $EXPERIMENT_MODE in
+        "ablation")
+            echo "开始消融实验（完整Transformer vs Decoder-Only）..."
+            echo "这将需要一些时间，请耐心等待..."
+            python train.py ablation
+            ;;
+        "full")
+            echo "开始训练完整Transformer模型..."
+            python train.py full
+            ;;
+        "decoder_only")
+            echo "开始训练Decoder-Only模型..."
+            python train.py decoder_only
+            ;;
+        *)
+            echo "未知模式: $EXPERIMENT_MODE，使用默认消融实验"
+            python train.py ablation
+            ;;
+    esac
+else
+    echo "✅ 跳过训练步骤 - 模型已训练完成"
+fi
 
 # ============================ 结果验证 ============================
 echo ""
-echo "=== 步骤6: 训练结果验证 ==="
+echo "=== 步骤7: 训练结果验证 ==="
 
-# 检查生成的图表和表格
-echo "检查训练结果输出..."
-if [ -d "$PROJECT_DIR/results" ]; then
+# 确定结果目录
+if [ -d "$PROJECT_DIR/src/results" ]; then
+    RESULTS_DIR="$PROJECT_DIR/src/results"
+elif [ -d "$PROJECT_DIR/results" ]; then
+    RESULTS_DIR="$PROJECT_DIR/results"
+else
+    RESULTS_DIR=""
+fi
+
+if [ -n "$RESULTS_DIR" ]; then
     echo "📊 训练结果汇总:"
     
     # 检查图表文件
-    if ls "$PROJECT_DIR/results/figures"/*.png 1> /dev/null 2>&1; then
+    if ls "$RESULTS_DIR/figures"/*.png 1> /dev/null 2>&1; then
         echo "✅ 训练曲线图:"
-        ls "$PROJECT_DIR/results/figures"/*.png
+        ls "$RESULTS_DIR/figures"/*.png
     else
         echo "❌ 未找到训练曲线图"
     fi
     
     # 检查数据表格
-    if ls "$PROJECT_DIR/results/tables"/*.csv 1> /dev/null 2>&1; then
+    if ls "$RESULTS_DIR/tables"/*.csv 1> /dev/null 2>&1; then
         echo "✅ 结果表格:"
-        ls "$PROJECT_DIR/results/tables"/*.csv
+        ls "$RESULTS_DIR/tables"/*.csv
         echo ""
         echo "📈 最终结果:"
         python -c "
@@ -163,7 +223,7 @@ import pandas as pd
 import glob
 import os
 
-csv_files = glob.glob('$PROJECT_DIR/results/tables/*final_results.csv')
+csv_files = glob.glob('$RESULTS_DIR/tables/*final_results.csv')
 for file in csv_files:
     df = pd.read_csv(file)
     filename = os.path.basename(file)
@@ -182,17 +242,26 @@ fi
 
 # ============================ 文本生成 ============================
 echo ""
-echo "=== 步骤7: 文本生成测试 ==="
+echo "=== 步骤8: 文本生成测试 ==="
 
 # 检查模型文件
 models_to_test=()
 
-if [ -f "$PROJECT_DIR/checkpoints/full_transformer_best.pt" ]; then
+# 检查多个可能的模型文件位置
+if [ -f "$PROJECT_DIR/src/checkpoints/full_transformer_best.pt" ]; then
     models_to_test+=("full_transformer")
+    MODEL_DIR="$PROJECT_DIR/src/checkpoints"
+elif [ -f "$PROJECT_DIR/checkpoints/full_transformer_best.pt" ]; then
+    models_to_test+=("full_transformer")
+    MODEL_DIR="$PROJECT_DIR/checkpoints"
 fi
 
-if [ -f "$PROJECT_DIR/checkpoints/decoder_only_best.pt" ]; then
+if [ -f "$PROJECT_DIR/src/checkpoints/decoder_only_best.pt" ]; then
     models_to_test+=("decoder_only")
+    MODEL_DIR="$PROJECT_DIR/src/checkpoints"
+elif [ -f "$PROJECT_DIR/checkpoints/decoder_only_best.pt" ]; then
+    models_to_test+=("decoder_only")
+    MODEL_DIR="$PROJECT_DIR/checkpoints"
 fi
 
 if [ ${#models_to_test[@]} -eq 0 ]; then
@@ -217,7 +286,7 @@ for model_type in "${models_to_test[@]}"; do
         echo "Prompt: \"$prompt\""
         echo "生成结果:"
         
-        # 调用生成脚本 - 修复转义问题
+        # 调用生成脚本
         cd "$PROJECT_DIR/src"
         python -c "
 import torch
@@ -236,15 +305,18 @@ try:
     
     model_type = '$model_type'
     prompt = '$prompt'
+    model_dir = '$MODEL_DIR'
     
     if model_type == 'full_transformer':
         model = FullTransformer(tokenizer.vocab_size)
-        model.load_state_dict(torch.load('../checkpoints/full_transformer_best.pt', map_location=device))
+        model_path = os.path.join(model_dir, 'full_transformer_best.pt')
+        model.load_state_dict(torch.load(model_path, map_location=device))
         model.to(device)
         result = generate_full_transformer(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8)
     else:
         model = DecoderOnlyTransformer(tokenizer.vocab_size)
-        model.load_state_dict(torch.load('../checkpoints/decoder_only_best.pt', map_location=device))
+        model_path = os.path.join(model_dir, 'decoder_only_best.pt')
+        model.load_state_dict(torch.load(model_path, map_location=device))
         model.to(device)
         result = generate_decoder_only(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8)
     
@@ -260,9 +332,9 @@ done
 
 # ============================ 消融实验分析 ============================
 echo ""
-echo "=== 步骤8: 消融实验分析 ==="
+echo "=== 步骤9: 消融实验分析 ==="
 
-if [ -f "$PROJECT_DIR/results/tables/ablation_study.csv" ]; then
+if [ -n "$RESULTS_DIR" ] && [ -f "$RESULTS_DIR/tables/ablation_study.csv" ]; then
     echo "📋 消融实验结果对比:"
     python -c "
 import pandas as pd
@@ -270,7 +342,7 @@ import matplotlib.pyplot as plt
 import os
 
 # 读取消融实验结果
-ablation_df = pd.read_csv('$PROJECT_DIR/results/tables/ablation_study.csv')
+ablation_df = pd.read_csv('$RESULTS_DIR/tables/ablation_study.csv')
 print(ablation_df[['model_type', 'final_val_loss', 'final_val_ppl', 'best_val_ppl']].round(4))
 
 # 生成简单的对比图
@@ -289,8 +361,8 @@ for bar, ppl in zip(bars, ppls):
              f'{ppl:.2f}', ha='center', va='bottom')
 
 plt.tight_layout()
-plt.savefig('$PROJECT_DIR/results/figures/ablation_summary.png', dpi=300, bbox_inches='tight')
-print('✅ 消融实验总结图已保存: $PROJECT_DIR/results/figures/ablation_summary.png')
+plt.savefig('$RESULTS_DIR/figures/ablation_summary.png', dpi=300, bbox_inches='tight')
+print('✅ 消融实验总结图已保存: $RESULTS_DIR/figures/ablation_summary.png')
     "
 else
     echo "ℹ️ 未找到消融实验数据表格"
@@ -298,23 +370,31 @@ fi
 
 # ============================ 完成总结 ============================
 echo ""
-echo "=== 步骤9: 实验完成 ==="
+echo "=== 步骤10: 实验完成 ==="
 echo "完成时间: $(date)"
 echo ""
 echo "🎉 实验结果汇总:"
 echo "✅ 环境配置完成"
 echo "✅ 依赖安装完成" 
-echo "✅ 数据准备完成"
-echo "✅ 模型训练完成 ($EXPERIMENT_MODE 模式)"
+if [ "$TRAINING_NEEDED" = true ]; then
+    echo "✅ 数据准备完成"
+    echo "✅ 模型训练完成 ($EXPERIMENT_MODE 模式)"
+else
+    echo "✅ 使用现有训练结果"
+fi
 echo "✅ 训练结果验证完成"
 echo "✅ 文本生成测试完成"
 echo "✅ 消融实验分析完成"
 echo ""
 echo "📁 生成的文件:"
-echo "模型文件: $PROJECT_DIR/checkpoints/"
-echo "训练曲线: $PROJECT_DIR/results/figures/"
-echo "数据表格: $PROJECT_DIR/results/tables/"
-echo "训练日志: $PROJECT_DIR/results/logs/"
+if [ -n "$MODEL_DIR" ]; then
+    echo "模型文件: $MODEL_DIR/"
+fi
+if [ -n "$RESULTS_DIR" ]; then
+    echo "训练曲线: $RESULTS_DIR/figures/"
+    echo "数据表格: $RESULTS_DIR/tables/"
+    echo "训练日志: $RESULTS_DIR/logs/"
+fi
 echo ""
 echo "================================================================"
 echo "                  复现脚本执行完毕！"
