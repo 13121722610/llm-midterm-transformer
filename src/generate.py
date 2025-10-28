@@ -13,8 +13,8 @@ def generate_full_transformer(model, tokenizer, prompt, max_new_tokens=200, temp
     idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long).to(device)
     
     for _ in range(max_new_tokens):
-        # 确保输入长度不超过最大序列长度
-        idx_cond = idx if idx.size(1) <= model.encoder.max_seq_len else idx[:, -model.encoder.max_seq_len:]
+        # 修复：使用固定的序列长度限制（与训练时一致）
+        idx_cond = idx if idx.size(1) <= 64 else idx[:, -64:]  # 硬编码为训练时的64
         
         # 使用相同的输入作为encoder和decoder的输入
         # 注意：这里我们使用完整的序列作为输入
