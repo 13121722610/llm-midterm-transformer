@@ -276,6 +276,7 @@ echo "开始生成测试..."
 # 测试不同的prompt
 prompts=("To be, or not to be" "Once upon a time" "The future of AI" "Love is" "In the beginning")
 
+# 使用修改后的generate.py进行文本生成
 for model_type in "${models_to_test[@]}"; do
     echo ""
     echo "🔍 测试模型: $model_type"
@@ -286,46 +287,13 @@ for model_type in "${models_to_test[@]}"; do
         echo "Prompt: \"$prompt\""
         echo "生成结果:"
         
-        # 调用生成脚本
+        # 使用修改后的generate.py进行生成（使用正确的配置）
         cd "$PROJECT_DIR/src"
-        python -c "
-import torch
-import sys
-import os
-sys.path.append('.')
-
-try:
-    from generate import generate_full_transformer, generate_decoder_only
-    from data import load_data
-    from model import FullTransformer, DecoderOnlyTransformer
-    
-    # 加载tokenizer和模型
-    tokenizer, _, _ = load_data()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    model_type = '$model_type'
-    prompt = '$prompt'
-    model_dir = '$MODEL_DIR'
-    
-    if model_type == 'full_transformer':
-        model = FullTransformer(tokenizer.vocab_size)
-        model_path = os.path.join(model_dir, 'full_transformer_best.pt')
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        model.to(device)
-        result = generate_full_transformer(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8)
-    else:
-        model = DecoderOnlyTransformer(tokenizer.vocab_size)
-        model_path = os.path.join(model_dir, 'decoder_only_best.pt')
-        model.load_state_dict(torch.load(model_path, map_location=device))
-        model.to(device)
-        result = generate_decoder_only(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8)
-    
-    print(result)
-except Exception as e:
-    print(f'生成错误: {e}')
-    import traceback
-    traceback.print_exc()
-        "
+        if [ "$model_type" == "full_transformer" ]; then
+            python generate.py --model full --prompt "$prompt" --max_new_tokens 30 --temperature 0.8
+        else
+            python generate.py --model decoder --prompt "$prompt" --max_new_tokens 30 --temperature 0.8
+        fi
         echo "----------------------------------------"
     done
 done
