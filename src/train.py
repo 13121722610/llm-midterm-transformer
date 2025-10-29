@@ -108,7 +108,7 @@ def train_transformer(model_type='full'):
     d_ff = 1024           # 增大前馈网络维度
     block_size = 256      # 增加序列长度
     batch_size = 32       # 增大批大小
-    epochs = 20           # 增加训练轮数
+    epochs = 5           # 增加训练轮数
     lr = 1e-4             # 调整学习率
     dropout = 0.1         # 添加dropout防止过拟合
     # =====================================================
