@@ -98,22 +98,26 @@ def save_training_log(epoch, train_loss, val_loss, train_ppl, val_ppl, filename=
         json.dump(logs, f, indent=2)
 
 def train_transformer(model_type='full'):
-    """训练Transformer模型"""
+    """训练Transformer模型 - 改进版本"""
     ensure_directories()
     
-    # 超参数
-    d_model = 64         # 减少模型维度
-    n_layer = 2          # 减少层数
-    n_head = 2           # 减少注意力头数
-    d_ff = 256           # 减少前馈网络维度
-    block_size = 64      # 减少序列长度
-    batch_size = 16      # 减少批大小
-    epochs = 5           # 减少训练轮数
-    lr = 3e-4
+    # ==================== 改进的超参数 ====================
+    d_model = 256         # 增大模型维度
+    n_layer = 6           # 增加层数
+    n_head = 8            # 增加注意力头数
+    d_ff = 1024           # 增大前馈网络维度
+    block_size = 256      # 增加序列长度
+    batch_size = 32       # 增大批大小
+    epochs = 20           # 增加训练轮数
+    lr = 1e-4             # 调整学习率
+    dropout = 0.1         # 添加dropout防止过拟合
+    # =====================================================
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     print(f"使用设备: {device}")
     print(f"训练模型类型: {model_type}")
+    print(f"改进配置: d_model={d_model}, n_layer={n_layer}, n_head={n_head}, epochs={epochs}")
 
     # 加载数据
     tokenizer, train_data, val_data = load_data()
@@ -130,9 +134,10 @@ def train_transformer(model_type='full'):
             n_layer=n_layer, 
             n_head=n_head, 
             d_ff=d_ff, 
-            max_seq_len=block_size
+            max_seq_len=block_size,
+            dropout=dropout
         )
-        model_name = "full_transformer"
+        model_name = "full_transformer_improved"
     else:
         model = DecoderOnlyTransformer(
             tokenizer.vocab_size,
@@ -140,12 +145,24 @@ def train_transformer(model_type='full'):
             n_layer=n_layer, 
             n_head=n_head, 
             d_ff=d_ff, 
-            max_seq_len=block_size
+            max_seq_len=block_size,
+            dropout=dropout
         )
-        model_name = "decoder_only"
+        model_name = "decoder_only_improved"
     
     model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    
+    # 改进的优化器配置
+    optimizer = torch.optim.AdamW(
+        model.parameters(), 
+        lr=lr,
+        weight_decay=0.1,  # 权重衰减
+        betas=(0.9, 0.98)  # Adam beta参数
+    )
+    
+    # 学习率调度器
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    
     criterion = nn.CrossEntropyLoss()
 
     # 训练记录
@@ -169,24 +186,25 @@ def train_transformer(model_type='full'):
             xb, yb = xb.to(device), yb.to(device)
             
             if model_type == 'full':
-                # 修复：对于完整Transformer，正确处理输入输出对齐
-                # 输入：xb[:, :-1] (去掉最后一个token)
-                # 目标：yb[:, :-1] (去掉第一个token，与输入对齐)
                 logits = model(xb[:, :-1], xb[:, :-1])  # (B, T-1, V)
                 loss = criterion(logits.view(-1, logits.size(-1)), yb[:, :-1].contiguous().view(-1))
             else:
-                # 对于decoder-only，直接处理
                 logits = model(xb)  # (B, T, V)
                 loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
             
             optimizer.zero_grad()
             loss.backward()
+            
+            # 梯度裁剪
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             
             total_train_loss += loss.item()
             pbar.set_postfix(loss=total_train_loss / (pbar.n + 1))
 
+        # 更新学习率
+        scheduler.step()
+        
         avg_train_loss = total_train_loss / len(train_loader)
         train_ppl = math.exp(avg_train_loss)
         train_losses.append(avg_train_loss)
@@ -215,7 +233,8 @@ def train_transformer(model_type='full'):
 
         print(f"Epoch {epoch+1}: "
               f"Train Loss: {avg_train_loss:.4f} (PPL: {train_ppl:.2f}) | "
-              f"Val Loss: {avg_val_loss:.4f} (PPL: {val_ppl:.2f})")
+              f"Val Loss: {avg_val_loss:.4f} (PPL: {val_ppl:.2f}) | "
+              f"LR: {scheduler.get_last_lr()[0]:.2e}")
 
         # 保存日志
         save_training_log(epoch+1, avg_train_loss, avg_val_loss, train_ppl, val_ppl, f"{model_name}_log.json")
@@ -238,7 +257,7 @@ def train_transformer(model_type='full'):
     
     # 保存最终结果表格
     final_results = {
-        'model_type': model_type,
+        'model_type': model_type + '_improved',
         'final_train_loss': train_losses[-1],
         'final_val_loss': val_losses[-1],
         'final_train_ppl': train_ppls[-1],
@@ -258,10 +277,10 @@ def train_transformer(model_type='full'):
     return final_results
 
 def ablation_study():
-    """进行消融实验"""
+    """进行消融实验 - 改进版本"""
     ensure_directories()
     
-    print("开始消融实验...")
+    print("开始改进的消融实验...")
     results = []
     
     # 训练完整Transformer
@@ -276,40 +295,52 @@ def ablation_study():
     
     # 保存消融实验结果
     ablation_df = pd.DataFrame(results)
-    ablation_file = "results/tables/ablation_study.csv"
+    ablation_file = "results/tables/ablation_study_improved.csv"
     ablation_df.to_csv(ablation_file, index=False)
     print(f"消融实验结果保存到: {ablation_file}")
     
     # 创建消融实验对比图
     plt.figure(figsize=(10, 6))
     
-    # 读取训练日志
-    full_logs = json.load(open("results/logs/full_transformer_log.json"))
-    decoder_logs = json.load(open("results/logs/decoder_only_log.json"))
-    
-    full_val_ppl = [log['val_ppl'] for log in full_logs]
-    decoder_val_ppl = [log['val_ppl'] for log in decoder_logs]
-    
-    plt.plot(full_val_ppl, label='Full Transformer', linewidth=2)
-    plt.plot(decoder_val_ppl, label='Decoder-Only', linewidth=2)
-    plt.xlabel('Epoch')
-    plt.ylabel('Validation Perplexity')
-    plt.title('Ablation Study: Model Architecture Comparison')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    ablation_plot = "results/figures/ablation_comparison.png"
-    plt.savefig(ablation_plot, dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    print(f"消融实验对比图保存到: {ablation_plot}")
+    try:
+        # 读取训练日志
+        full_logs = json.load(open("results/logs/full_transformer_improved_log.json"))
+        decoder_logs = json.load(open("results/logs/decoder_only_improved_log.json"))
+        
+        full_val_ppl = [log['val_ppl'] for log in full_logs]
+        decoder_val_ppl = [log['val_ppl'] for log in decoder_logs]
+        
+        plt.plot(full_val_ppl, label='Full Transformer (Improved)', linewidth=2)
+        plt.plot(decoder_val_ppl, label='Decoder-Only (Improved)', linewidth=2)
+        plt.xlabel('Epoch')
+        plt.ylabel('Validation Perplexity')
+        plt.title('Improved Ablation Study: Model Architecture Comparison')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        ablation_plot = "results/figures/ablation_comparison_improved.png"
+        plt.savefig(ablation_plot, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"消融实验对比图保存到: {ablation_plot}")
+    except Exception as e:
+        print(f"生成对比图时出错: {e}")
     
     return results
 
 if __name__ == "__main__":
     # 可以选择训练单个模型或进行消融实验
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == 'ablation':
-        ablation_study()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'ablation':
+            ablation_study()
+        elif sys.argv[1] == 'decoder_only':
+            train_transformer('decoder_only')
+        else:
+            train_transformer('full')
     else:
-        train_transformer('full')  # 默认训练完整Transformer
+        print("使用方法:")
+        print("  python train.py ablation     # 消融实验")
+        print("  python train.py full         # 完整Transformer")
+        print("  python train.py decoder_only # Decoder-Only")
+        print("改进配置已启用!")
