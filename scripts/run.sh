@@ -108,7 +108,7 @@ check_training_complete() {
         echo "✅ 发现已训练的模型文件:"
         for model in "${found_models[@]}"; do
             echo "   - $(basename $model)"
-        fi
+        done
         echo ""
         echo "💡 提示: 模型已训练完成，跳过训练步骤"
         return 0  # 训练已完成
@@ -233,7 +233,9 @@ if [ -n "$RESULTS_DIR" ]; then
     # 检查图表文件
     if ls "$RESULTS_DIR/figures"/*.png 1> /dev/null 2>&1; then
         echo "✅ 训练曲线图:"
-        ls "$RESULTS_DIR/figures"/*.png
+        for file in "$RESULTS_DIR/figures"/*.png; do
+            echo "   - $(basename $file)"
+        done
     else
         echo "❌ 未找到训练曲线图"
     fi
@@ -241,7 +243,9 @@ if [ -n "$RESULTS_DIR" ]; then
     # 检查数据表格
     if ls "$RESULTS_DIR/tables"/*.csv 1> /dev/null 2>&1; then
         echo "✅ 结果表格:"
-        ls "$RESULTS_DIR/tables"/*.csv
+        for file in "$RESULTS_DIR/tables"/*.csv; do
+            echo "   - $(basename $file)"
+        done
         echo ""
         echo "📈 最终结果:"
         python -c "
@@ -251,14 +255,17 @@ import os
 
 csv_files = glob.glob('$RESULTS_DIR/tables/*final_results.csv')
 for file in csv_files:
-    df = pd.read_csv(file)
-    filename = os.path.basename(file)
-    print(f'文件: {filename}')
-    for col in df.columns:
-        if 'ppl' in col.lower() or 'loss' in col.lower():
-            print(f'  {col}: {df[col].values[0]:.4f}')
-    print()
-        "
+    try:
+        df = pd.read_csv(file)
+        filename = os.path.basename(file)
+        print(f'文件: {filename}')
+        for col in df.columns:
+            if 'ppl' in col.lower() or 'loss' in col.lower():
+                print(f'  {col}: {df[col].values[0]:.4f}')
+        print()
+    except Exception as e:
+        print(f'读取文件 {file} 时出错: {e}')
+"
     else
         echo "❌ 未找到结果表格"
     fi
