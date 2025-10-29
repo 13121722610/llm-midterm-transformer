@@ -192,7 +192,6 @@ def train_transformer(model_type='full'):
         mode='min', 
         factor=0.5, 
         patience=2, 
-        verbose=True,
         min_lr=1e-6
     )
     
