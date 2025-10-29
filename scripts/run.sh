@@ -84,37 +84,36 @@ echo "=== 步骤4: 训练状态检查 ==="
 
 TRAINING_NEEDED=true
 
-# 检查是否已经训练完成
+# 检查是否已经训练完成 - 修改为检查模型文件
 check_training_complete() {
-    if [ -f "$PROJECT_DIR/src/results/tables/ablation_study.csv" ] || [ -f "$PROJECT_DIR/results/tables/ablation_study.csv" ]; then
-        echo "✅ 发现已完成的训练结果！"
-        echo "当前训练状态:"
-        
-        if [ -f "$PROJECT_DIR/src/results/tables/ablation_study.csv" ]; then
-            RESULTS_DIR="$PROJECT_DIR/src/results"
-        else
-            RESULTS_DIR="$PROJECT_DIR/results"
+    # 检查各种可能的模型文件
+    model_files=(
+        "$PROJECT_DIR/src/checkpoints/decoder_only_improved_best.pt"
+        "$PROJECT_DIR/src/checkpoints/full_transformer_improved_best.pt"
+        "$PROJECT_DIR/src/checkpoints/decoder_only_best.pt"
+        "$PROJECT_DIR/src/checkpoints/full_transformer_best.pt"
+        "$PROJECT_DIR/src/checkpoints/best.pt"
+        "$PROJECT_DIR/checkpoints/decoder_only_improved_best.pt"
+        "$PROJECT_DIR/checkpoints/full_transformer_improved_best.pt"
+    )
+    
+    found_models=()
+    for model_file in "${model_files[@]}"; do
+        if [ -f "$model_file" ]; then
+            found_models+=("$model_file")
         fi
-        
-        python -c "
-import pandas as pd
-try:
-    df = pd.read_csv('$RESULTS_DIR/tables/ablation_study.csv')
-    full_ppl = df[df['model_type']=='full']['best_val_ppl'].values[0]
-    decoder_ppl = df[df['model_type']=='decoder_only']['best_val_ppl'].values[0]
-    improvement = (decoder_ppl - full_ppl) / decoder_ppl * 100
-    print('📊 现有训练结果:')
-    print(f'   完整Transformer - 困惑度: {full_ppl:.3f}')
-    print(f'   Decoder-Only - 困惑度: {decoder_ppl:.3f}')
-    print(f'   🎯 性能提升: {improvement:.1f}%')
-    print('')
-    print('💡 提示: 训练已完成，跳过训练步骤')
-except Exception as e:
-    print('读取训练结果时出错:', e)
-"
+    done
+    
+    if [ ${#found_models[@]} -gt 0 ]; then
+        echo "✅ 发现已训练的模型文件:"
+        for model in "${found_models[@]}"; do
+            echo "   - $(basename $model)"
+        fi
+        echo ""
+        echo "💡 提示: 模型已训练完成，跳过训练步骤"
         return 0  # 训练已完成
     else
-        echo "❌ 未找到完整的训练结果"
+        echo "❌ 未找到训练好的模型文件"
         return 1  # 需要训练
     fi
 }
@@ -122,7 +121,7 @@ except Exception as e:
 # 执行训练检查
 if check_training_complete; then
     TRAINING_NEEDED=false
-    echo "跳过训练步骤，直接进行结果展示..."
+    echo "跳过训练步骤，直接进行文本生成..."
 else
     echo "开始新的训练..."
 fi
@@ -186,6 +185,33 @@ else:
     esac
 else
     echo "✅ 跳过训练步骤 - 模型已训练完成"
+    
+    # 即使跳过训练，也显示现有的训练结果（如果有的话）
+    if [ -f "$PROJECT_DIR/src/results/tables/ablation_study.csv" ] || [ -f "$PROJECT_DIR/results/tables/ablation_study.csv" ]; then
+        echo ""
+        echo "📊 现有训练结果:"
+        RESULTS_DIR="$PROJECT_DIR/src/results"
+        if [ -f "$PROJECT_DIR/results/tables/ablation_study.csv" ]; then
+            RESULTS_DIR="$PROJECT_DIR/results"
+        fi
+        
+        python -c "
+import pandas as pd
+try:
+    df = pd.read_csv('$RESULTS_DIR/tables/ablation_study.csv')
+    if 'model_type' in df.columns and 'best_val_ppl' in df.columns:
+        full_ppl = df[df['model_type']=='full']['best_val_ppl'].values[0]
+        decoder_ppl = df[df['model_type']=='decoder_only']['best_val_ppl'].values[0]
+        improvement = (decoder_ppl - full_ppl) / decoder_ppl * 100
+        print(f'   完整Transformer - 困惑度: {full_ppl:.3f}')
+        print(f'   Decoder-Only - 困惑度: {decoder_ppl:.3f}')
+        print(f'   🎯 性能提升: {improvement:.1f}%')
+    else:
+        print('   训练结果格式不匹配')
+except Exception as e:
+    print('   读取训练结果时出错，但模型文件存在')
+"
+    fi
 fi
 
 # ============================ 结果验证 ============================
@@ -237,7 +263,7 @@ for file in csv_files:
         echo "❌ 未找到结果表格"
     fi
 else
-    echo "❌ 未找到results目录"
+    echo "ℹ️ 未找到results目录 - 可能使用了现有模型"
 fi
 
 # ============================ 文本生成 ============================
@@ -248,21 +274,37 @@ echo "=== 步骤8: 文本生成测试 ==="
 models_to_test=()
 
 # 检查多个可能的模型文件位置
-if [ -f "$PROJECT_DIR/src/checkpoints/full_transformer_best.pt" ]; then
-    models_to_test+=("full_transformer")
-    MODEL_DIR="$PROJECT_DIR/src/checkpoints"
-elif [ -f "$PROJECT_DIR/checkpoints/full_transformer_best.pt" ]; then
-    models_to_test+=("full_transformer")
-    MODEL_DIR="$PROJECT_DIR/checkpoints"
-fi
+model_files_to_check=(
+    "decoder_only_improved_best.pt"
+    "full_transformer_improved_best.pt" 
+    "decoder_only_best.pt"
+    "full_transformer_best.pt"
+    "best.pt"
+)
 
-if [ -f "$PROJECT_DIR/src/checkpoints/decoder_only_best.pt" ]; then
-    models_to_test+=("decoder_only")
-    MODEL_DIR="$PROJECT_DIR/src/checkpoints"
-elif [ -f "$PROJECT_DIR/checkpoints/decoder_only_best.pt" ]; then
-    models_to_test+=("decoder_only")
-    MODEL_DIR="$PROJECT_DIR/checkpoints"
-fi
+for model_file in "${model_files_to_check[@]}"; do
+    if [ -f "$PROJECT_DIR/src/checkpoints/$model_file" ]; then
+        if [[ "$model_file" == *"decoder"* ]]; then
+            models_to_test+=("decoder_only")
+        elif [[ "$model_file" == *"full"* ]]; then
+            models_to_test+=("full_transformer")
+        elif [[ "$model_file" == "best.pt" ]]; then
+            # 检查best.pt实际是什么模型
+            if [ -f "$PROJECT_DIR/src/checkpoints/decoder_only_improved_best.pt" ]; then
+                models_to_test+=("decoder_only")
+            elif [ -f "$PROJECT_DIR/src/checkpoints/full_transformer_improved_best.pt" ]; then
+                models_to_test+=("full_transformer")
+            else
+                models_to_test+=("decoder_only")  # 默认
+            fi
+        fi
+        MODEL_DIR="$PROJECT_DIR/src/checkpoints"
+        break
+    fi
+done
+
+# 去重
+models_to_test=($(echo "${models_to_test[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '))
 
 if [ ${#models_to_test[@]} -eq 0 ]; then
     echo "❌ 错误: 未找到训练好的模型文件"
@@ -290,55 +332,17 @@ for model_type in "${models_to_test[@]}"; do
         # 使用修改后的generate.py进行生成（使用正确的配置）
         cd "$PROJECT_DIR/src"
         if [ "$model_type" == "full_transformer" ]; then
-            python generate.py --model full --prompt "$prompt" --max_new_tokens 30 --temperature 0.8
+            python generate.py --model full --prompt "$prompt" --max_new_tokens 50 --temperature 0.8
         else
-            python generate.py --model decoder --prompt "$prompt" --max_new_tokens 30 --temperature 0.8
+            python generate.py --model decoder --prompt "$prompt" --max_new_tokens 50 --temperature 0.8
         fi
         echo "----------------------------------------"
     done
 done
 
-# ============================ 消融实验分析 ============================
-echo ""
-echo "=== 步骤9: 消融实验分析 ==="
-
-if [ -n "$RESULTS_DIR" ] && [ -f "$RESULTS_DIR/tables/ablation_study.csv" ]; then
-    echo "📋 消融实验结果对比:"
-    python -c "
-import pandas as pd
-import matplotlib.pyplot as plt
-import os
-
-# 读取消融实验结果
-ablation_df = pd.read_csv('$RESULTS_DIR/tables/ablation_study.csv')
-print(ablation_df[['model_type', 'final_val_loss', 'final_val_ppl', 'best_val_ppl']].round(4))
-
-# 生成简单的对比图
-plt.figure(figsize=(10, 6))
-models = ablation_df['model_type'].tolist()
-ppls = ablation_df['best_val_ppl'].tolist()
-
-bars = plt.bar(models, ppls, color=['skyblue', 'lightcoral'])
-plt.ylabel('Best Validation Perplexity')
-plt.title('Ablation Study: Model Performance Comparison')
-plt.grid(True, alpha=0.3)
-
-# 在柱状图上添加数值
-for bar, ppl in zip(bars, ppls):
-    plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
-             f'{ppl:.2f}', ha='center', va='bottom')
-
-plt.tight_layout()
-plt.savefig('$RESULTS_DIR/figures/ablation_summary.png', dpi=300, bbox_inches='tight')
-print('✅ 消融实验总结图已保存: $RESULTS_DIR/figures/ablation_summary.png')
-    "
-else
-    echo "ℹ️ 未找到消融实验数据表格"
-fi
-
 # ============================ 完成总结 ============================
 echo ""
-echo "=== 步骤10: 实验完成 ==="
+echo "=== 步骤9: 实验完成 ==="
 echo "完成时间: $(date)"
 echo ""
 echo "🎉 实验结果汇总:"
@@ -352,11 +356,11 @@ else
 fi
 echo "✅ 训练结果验证完成"
 echo "✅ 文本生成测试完成"
-echo "✅ 消融实验分析完成"
 echo ""
 echo "📁 生成的文件:"
 if [ -n "$MODEL_DIR" ]; then
     echo "模型文件: $MODEL_DIR/"
+    ls -la "$MODEL_DIR"/*.pt 2>/dev/null || echo "   无模型文件"
 fi
 if [ -n "$RESULTS_DIR" ]; then
     echo "训练曲线: $RESULTS_DIR/figures/"
