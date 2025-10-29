@@ -2,7 +2,7 @@
 import torch
 import argparse
 from data import load_data
-from model import DecoderOnlyTransformer
+from model import DecoderOnlyTransformer, FullTransformer  # 添加FullTransformer导入
 
 def generate_with_sampling(model, tokenizer, prompt, max_new_tokens=200, temperature=0.8, top_k=20, top_p=0.9):
     """使用改进采样策略的生成函数"""
@@ -15,8 +15,14 @@ def generate_with_sampling(model, tokenizer, prompt, max_new_tokens=200, tempera
         # 序列长度限制
         idx_cond = idx if idx.size(1) <= model.max_seq_len else idx[:, -model.max_seq_len:]
         
-        # 获取logits
-        logits = model(idx_cond)
+        # 获取logits - 根据模型类型调整
+        if isinstance(model, FullTransformer):
+            # FullTransformer需要encoder输入，这里简单重复输入作为encoder输入
+            logits = model(idx_cond, idx_cond)
+        else:
+            # DecoderOnlyTransformer
+            logits = model(idx_cond)
+            
         logits = logits[:, -1, :] / temperature
         
         # Top-k 采样
@@ -68,18 +74,19 @@ def main():
         'd_model': 256,           # 与训练一致
         'n_layer': 6,             # 与训练一致  
         'n_head': 8,              # 与训练一致
-        'd_ff': 1024,             # 与训练一致（从错误信息推断）
-        'max_seq_len': 256,       # 与训练一致（从错误信息推断）
+        'd_ff': 1024,             # 与训练一致
+        'max_seq_len': 256,       # 与训练一致
         'dropout': 0.1
     }
     
     if args.model == 'full':
         print("使用完整Transformer生成...")
-        model = DecoderOnlyTransformer(**model_config)
+        # 使用FullTransformer类
+        model = FullTransformer(**model_config)
         model_files = [
             "checkpoints/full_transformer_improved_best.pt",
-            "checkpoints/best.pt",
-            "checkpoints/full_transformer_best.pt"
+            "checkpoints/full_transformer_best.pt",
+            "checkpoints/best.pt"
         ]
         
         model_loaded = False
@@ -87,7 +94,7 @@ def main():
             try:
                 model.load_state_dict(torch.load(model_file, map_location=device))
                 model.to(device)
-                print(f"成功加载模型: {model_file}")
+                print(f"成功加载完整Transformer模型: {model_file}")
                 model_loaded = True
                 break
             except FileNotFoundError:
@@ -106,7 +113,7 @@ def main():
             print(f"输出: {result}")
             print(f"参数: temperature={args.temperature}, top_k={args.top_k}, top_p={args.top_p}")
         else:
-            print("所有完整Transformer模型文件都未找到，请先训练模型")
+            print("所有完整Transformer模型文件都未找到或加载失败，请先训练模型")
             
     else:
         print("使用Decoder-Only Transformer生成...")
@@ -122,7 +129,7 @@ def main():
             try:
                 model.load_state_dict(torch.load(model_file, map_location=device))
                 model.to(device)
-                print(f"成功加载模型: {model_file}")
+                print(f"成功加载Decoder-Only模型: {model_file}")
                 model_loaded = True
                 break
             except FileNotFoundError:
@@ -141,7 +148,7 @@ def main():
             print(f"输出: {result}")
             print(f"参数: temperature={args.temperature}, top_k={args.top_k}, top_p={args.top_p}")
         else:
-            print("所有Decoder-Only模型文件都未找到，请先训练模型")
+            print("所有Decoder-Only模型文件都未找到或加载失败，请先训练模型")
 
 if __name__ == "__main__":
     main()
