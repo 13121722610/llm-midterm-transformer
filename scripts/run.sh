@@ -289,24 +289,29 @@ model_files_to_check=(
     "best.pt"
 )
 
+# 修复：移除break语句，检查所有模型文件
 for model_file in "${model_files_to_check[@]}"; do
     if [ -f "$PROJECT_DIR/src/checkpoints/$model_file" ]; then
-        if [[ "$model_file" == *"decoder"* ]]; then
+        if [[ "$model_file" == *"decoder"* ]] && [[ ! " ${models_to_test[@]} " =~ " decoder_only " ]]; then
             models_to_test+=("decoder_only")
-        elif [[ "$model_file" == *"full"* ]]; then
+            echo "找到decoder模型: $model_file"
+        elif [[ "$model_file" == *"full"* ]] && [[ ! " ${models_to_test[@]} " =~ " full_transformer " ]]; then
             models_to_test+=("full_transformer")
+            echo "找到full transformer模型: $model_file"
         elif [[ "$model_file" == "best.pt" ]]; then
             # 检查best.pt实际是什么模型
-            if [ -f "$PROJECT_DIR/src/checkpoints/decoder_only_improved_best.pt" ]; then
+            if [ -f "$PROJECT_DIR/src/checkpoints/decoder_only_improved_best.pt" ] && [[ ! " ${models_to_test[@]} " =~ " decoder_only " ]]; then
                 models_to_test+=("decoder_only")
-            elif [ -f "$PROJECT_DIR/src/checkpoints/full_transformer_improved_best.pt" ]; then
+                echo "best.pt指向decoder模型"
+            elif [ -f "$PROJECT_DIR/src/checkpoints/full_transformer_improved_best.pt" ] && [[ ! " ${models_to_test[@]} " =~ " full_transformer " ]]; then
                 models_to_test+=("full_transformer")
-            else
+                echo "best.pt指向full transformer模型"
+            elif [[ ! " ${models_to_test[@]} " =~ " decoder_only " ]]; then
                 models_to_test+=("decoder_only")  # 默认
+                echo "best.pt使用默认decoder模型"
             fi
         fi
         MODEL_DIR="$PROJECT_DIR/src/checkpoints"
-        break
     fi
 done
 
