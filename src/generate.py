@@ -105,14 +105,19 @@ def main():
                 continue
         
         if model_loaded:
+            # 为完整Transformer设置专门的生成参数
+            full_temp = 1.2  # 更高的温度增加多样性
+            full_top_k = 10  # 更严格的top-k
+            full_top_p = 0.8 # 更严格的top-p
+            
             result = generate_with_sampling(
                 model, tokenizer, args.prompt, 
-                args.max_new_tokens, args.temperature, args.top_k, args.top_p,
-                max_seq_len=model_config['max_seq_len']  # 传入max_seq_len参数
+                args.max_new_tokens, full_temp, full_top_k, full_top_p,
+                max_seq_len=model_config['max_seq_len']
             )
             print(f"输入: {args.prompt}")
             print(f"输出: {result}")
-            print(f"参数: temperature={args.temperature}, top_k={args.top_k}, top_p={args.top_p}")
+            print(f"参数: temperature={full_temp}, top_k={full_top_k}, top_p={full_top_p} (为完整Transformer优化)")
         else:
             print("所有完整Transformer模型文件都未找到或加载失败，请先训练模型")
             
@@ -141,10 +146,11 @@ def main():
                 continue
         
         if model_loaded:
+            # 保持原有的Decoder-Only参数
             result = generate_with_sampling(
                 model, tokenizer, args.prompt,
                 args.max_new_tokens, args.temperature, args.top_k, args.top_p,
-                max_seq_len=model.max_seq_len  # DecoderOnlyTransformer有这个属性
+                max_seq_len=model.max_seq_len
             )
             print(f"输入: {args.prompt}")
             print(f"输出: {result}")
