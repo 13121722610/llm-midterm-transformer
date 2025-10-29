@@ -2,9 +2,9 @@
 import torch
 import argparse
 from data import load_data
-from model import DecoderOnlyTransformer, FullTransformer  # 添加FullTransformer导入
+from model import DecoderOnlyTransformer, FullTransformer
 
-def generate_with_sampling(model, tokenizer, prompt, max_new_tokens=200, temperature=0.8, top_k=20, top_p=0.9):
+def generate_with_sampling(model, tokenizer, prompt, max_new_tokens=200, temperature=0.8, top_k=20, top_p=0.9, max_seq_len=256):
     """使用改进采样策略的生成函数"""
     model.eval()
     device = next(model.parameters()).device
@@ -12,8 +12,8 @@ def generate_with_sampling(model, tokenizer, prompt, max_new_tokens=200, tempera
     idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long).to(device)
     
     for _ in range(max_new_tokens):
-        # 序列长度限制
-        idx_cond = idx if idx.size(1) <= model.max_seq_len else idx[:, -model.max_seq_len:]
+        # 序列长度限制 - 使用传入的max_seq_len参数
+        idx_cond = idx if idx.size(1) <= max_seq_len else idx[:, -max_seq_len:]
         
         # 获取logits - 根据模型类型调整
         if isinstance(model, FullTransformer):
@@ -107,7 +107,8 @@ def main():
         if model_loaded:
             result = generate_with_sampling(
                 model, tokenizer, args.prompt, 
-                args.max_new_tokens, args.temperature, args.top_k, args.top_p
+                args.max_new_tokens, args.temperature, args.top_k, args.top_p,
+                max_seq_len=model_config['max_seq_len']  # 传入max_seq_len参数
             )
             print(f"输入: {args.prompt}")
             print(f"输出: {result}")
@@ -142,7 +143,8 @@ def main():
         if model_loaded:
             result = generate_with_sampling(
                 model, tokenizer, args.prompt,
-                args.max_new_tokens, args.temperature, args.top_k, args.top_p
+                args.max_new_tokens, args.temperature, args.top_k, args.top_p,
+                max_seq_len=model.max_seq_len  # DecoderOnlyTransformer有这个属性
             )
             print(f"输入: {args.prompt}")
             print(f"输出: {result}")
