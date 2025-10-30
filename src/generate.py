@@ -71,10 +71,10 @@ def main():
     # 统一的模型配置 - 与训练时完全一致
     model_config = {
         'vocab_size': tokenizer.vocab_size,
-        'd_model': 256,           # 与训练一致
-        'n_layer': 6,             # 与训练一致  
-        'n_head': 8,              # 与训练一致
-        'd_ff': 1024,             # 与训练一致
+        'd_model': 128,           # 与训练一致
+        'n_layer': 4,             # 与训练一致  
+        'n_head': 4,              # 与训练一致
+        'd_ff': 512,             # 与训练一致
         'max_seq_len': 256,       # 与训练一致
         'dropout': 0.1
     }
