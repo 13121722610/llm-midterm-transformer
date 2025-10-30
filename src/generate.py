@@ -68,19 +68,18 @@ def main():
     tokenizer, _, _ = load_data()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # 统一的模型配置 - 与训练时完全一致
-    model_config = {
-        'vocab_size': tokenizer.vocab_size,
-        'd_model': 128,           # 与训练一致
-        'n_layer': 4,             # 与训练一致  
-        'n_head': 4,              # 与训练一致
-        'd_ff': 512,             # 与训练一致
-        'max_seq_len': 128,       # 与训练一致
-        'dropout': 0.1
-    }
-    
     if args.model == 'full':
         print("使用完整Transformer生成...")
+        # FullTransformer配置 - 与保存的权重匹配
+        model_config = {
+            'vocab_size': tokenizer.vocab_size,
+            'd_model': 128,           # FullTransformer使用128
+            'n_layer': 4,             # FullTransformer使用4层
+            'n_head': 4,
+            'd_ff': 512,
+            'max_seq_len': 128,
+            'dropout': 0.1
+        }
         # 使用FullTransformer类
         model = FullTransformer(**model_config)
         model_files = [
@@ -123,6 +122,16 @@ def main():
             
     else:
         print("使用Decoder-Only Transformer生成...")
+        # Decoder-Only配置 - 与保存的权重匹配
+        model_config = {
+            'vocab_size': tokenizer.vocab_size,
+            'd_model': 256,           # Decoder-Only使用256
+            'n_layer': 6,             # Decoder-Only使用6层
+            'n_head': 8,
+            'd_ff': 1024,
+            'max_seq_len': 256,
+            'dropout': 0.1
+        }
         model = DecoderOnlyTransformer(**model_config)
         model_files = [
             "checkpoints/decoder_only_improved_best.pt",
@@ -150,7 +159,7 @@ def main():
             result = generate_with_sampling(
                 model, tokenizer, args.prompt,
                 args.max_new_tokens, args.temperature, args.top_k, args.top_p,
-                max_seq_len=model.max_seq_len
+                max_seq_len=model_config['max_seq_len']
             )
             print(f"输入: {args.prompt}")
             print(f"输出: {result}")
