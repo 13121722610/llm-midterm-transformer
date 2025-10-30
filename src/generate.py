@@ -75,7 +75,7 @@ def main():
         'n_layer': 4,             # 与训练一致  
         'n_head': 4,              # 与训练一致
         'd_ff': 512,             # 与训练一致
-        'max_seq_len': 256,       # 与训练一致
+        'max_seq_len': 128,       # 与训练一致
         'dropout': 0.1
     }
     
