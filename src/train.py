@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from data import load_data
-from model import FullTransformer, DecoderOnlyTransformer
+from model import DecoderOnlyTransformer  # 只导入DecoderOnlyTransformer
 
 class CharDataset(Dataset):
     def __init__(self, data, block_size):
@@ -97,53 +97,35 @@ def save_training_log(epoch, train_loss, val_loss, train_ppl, val_ppl, filename=
     with open(filepath, 'w') as f:
         json.dump(logs, f, indent=2)
 
-def get_model_config(model_type='full'):
-    """根据模型类型返回合适的配置 - 解决过拟合"""
-    if model_type == 'full':
-        # 完整Transformer：使用更小的配置防止过拟合
-        return {
-            'd_model': 128,        # 减小维度
-            'n_layer': 4,          # 减少层数
-            'n_head': 4,           # 减少头数
-            'd_ff': 512,           # 减小前馈网络
-            'block_size': 128,     # 减小序列长度
-            'batch_size': 32,
-            'epochs': 10,          # 更多轮次但使用早停
-            'lr': 1e-4,
-            'dropout': 0.3,        # 增加dropout
-            'weight_decay': 0.1,   # 权重衰减
-            'patience': 3          # 早停耐心值
-        }
-    else:
-        # Decoder-Only：保持较大配置
-        return {
-            'd_model': 256,
-            'n_layer': 6,
-            'n_head': 8,
-            'd_ff': 1024,
-            'block_size': 256,
-            'batch_size': 32,
-            'epochs': 5,
-            'lr': 1e-4,
-            'dropout': 0.1,
-            'weight_decay': 0.01,
-            'patience': 5
-        }
+def get_model_config():
+    """返回Decoder-Only模型的配置"""
+    return {
+        'd_model': 256,
+        'n_layer': 6,
+        'n_head': 8,
+        'd_ff': 1024,
+        'block_size': 256,
+        'batch_size': 32,
+        'epochs': 5,
+        'lr': 1e-4,
+        'dropout': 0.1,
+        'weight_decay': 0.01,
+        'patience': 5
+    }
 
-def train_transformer(model_type='full'):
-    """训练Transformer模型 - 修复过拟合版本"""
+def train_decoder_only():
+    """训练Decoder-Only Transformer模型"""
     ensure_directories()
     
-    # 获取针对性的配置
-    config = get_model_config(model_type)
+    # 获取配置
+    config = get_model_config()
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     print(f"使用设备: {device}")
-    print(f"训练模型类型: {model_type}")
-    print(f"优化配置: d_model={config['d_model']}, n_layer={config['n_layer']}, "
-          f"n_head={config['n_head']}, dropout={config['dropout']}, "
-          f"weight_decay={config['weight_decay']}")
+    print(f"训练模型: Decoder-Only Transformer")
+    print(f"配置: d_model={config['d_model']}, n_layer={config['n_layer']}, "
+          f"n_head={config['n_head']}, dropout={config['dropout']}")
 
     # 加载数据
     tokenizer, train_data, val_data = load_data()
@@ -152,29 +134,17 @@ def train_transformer(model_type='full'):
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config['batch_size'])
 
-    # 初始化模型
-    if model_type == 'full':
-        model = FullTransformer(
-            tokenizer.vocab_size, 
-            d_model=config['d_model'], 
-            n_layer=config['n_layer'], 
-            n_head=config['n_head'], 
-            d_ff=config['d_ff'], 
-            max_seq_len=config['block_size'],
-            dropout=config['dropout']
-        )
-        model_name = "full_transformer_fixed"
-    else:
-        model = DecoderOnlyTransformer(
-            tokenizer.vocab_size,
-            d_model=config['d_model'], 
-            n_layer=config['n_layer'], 
-            n_head=config['n_head'], 
-            d_ff=config['d_ff'], 
-            max_seq_len=config['block_size'],
-            dropout=config['dropout']
-        )
-        model_name = "decoder_only_improved"
+    # 初始化模型 - 只使用DecoderOnlyTransformer
+    model = DecoderOnlyTransformer(
+        tokenizer.vocab_size,
+        d_model=config['d_model'], 
+        n_layer=config['n_layer'], 
+        n_head=config['n_head'], 
+        d_ff=config['d_ff'], 
+        max_seq_len=config['block_size'],
+        dropout=config['dropout']
+    )
+    model_name = "decoder_only"
     
     model = model.to(device)
     
@@ -186,7 +156,7 @@ def train_transformer(model_type='full'):
         betas=(0.9, 0.98)
     )
     
-    # 学习率调度器 - 使用ReduceLROnPlateau
+    # 学习率调度器
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 
         mode='min', 
@@ -218,12 +188,9 @@ def train_transformer(model_type='full'):
         for xb, yb in pbar:
             xb, yb = xb.to(device), yb.to(device)
             
-            if model_type == 'full':
-                logits = model(xb[:, :-1], xb[:, :-1])  # (B, T-1, V)
-                loss = criterion(logits.view(-1, logits.size(-1)), yb[:, :-1].contiguous().view(-1))
-            else:
-                logits = model(xb)  # (B, T, V)
-                loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
+            # 简化：直接使用Decoder-Only模型
+            logits = model(xb)  # (B, T, V)
+            loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
             
             optimizer.zero_grad()
             loss.backward()
@@ -247,12 +214,8 @@ def train_transformer(model_type='full'):
             for xb, yb in val_loader:
                 xb, yb = xb.to(device), yb.to(device)
                 
-                if model_type == 'full':
-                    logits = model(xb[:, :-1], xb[:, :-1])
-                    loss = criterion(logits.view(-1, logits.size(-1)), yb[:, :-1].contiguous().view(-1))
-                else:
-                    logits = model(xb)
-                    loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
+                logits = model(xb)
+                loss = criterion(logits.view(-1, logits.size(-1)), yb.view(-1))
                 
                 total_val_loss += loss.item()
 
@@ -320,80 +283,6 @@ def train_transformer(model_type='full'):
     
     return final_results
 
-def ablation_study():
-    """进行消融实验 - 修复过拟合版本"""
-    ensure_directories()
-    
-    print("开始修复过拟合的消融实验...")
-    results = []
-    
-    # 训练完整Transformer（使用修复配置）
-    print("\n1. 训练完整Transformer（修复过拟合）...")
-    full_results = train_transformer('full')
-    results.append(full_results)
-    
-    # 训练Decoder-Only Transformer
-    print("\n2. 训练Decoder-Only Transformer...")
-    decoder_results = train_transformer('decoder_only')
-    results.append(decoder_results)
-    
-    # 保存消融实验结果
-    ablation_df = pd.DataFrame(results)
-    ablation_file = "results/tables/ablation_study_fixed.csv"
-    ablation_df.to_csv(ablation_file, index=False)
-    print(f"消融实验结果保存到: {ablation_file}")
-    
-    # 创建消融实验对比图
-    plt.figure(figsize=(10, 6))
-    
-    try:
-        # 读取训练日志
-        full_logs = json.load(open("results/logs/full_transformer_fixed_log.json"))
-        decoder_logs = json.load(open("results/logs/decoder_only_improved_log.json"))
-        
-        full_val_ppl = [log['val_ppl'] for log in full_logs]
-        decoder_val_ppl = [log['val_ppl'] for log in decoder_logs]
-        
-        plt.plot(full_val_ppl, label='Full Transformer (Fixed)', linewidth=2, marker='o')
-        plt.plot(decoder_val_ppl, label='Decoder-Only', linewidth=2, marker='s')
-        plt.xlabel('Epoch')
-        plt.ylabel('Validation Perplexity')
-        plt.title('Fixed Overfitting: Model Architecture Comparison')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        ablation_plot = "results/figures/ablation_comparison_fixed.png"
-        plt.savefig(ablation_plot, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        print(f"消融实验对比图保存到: {ablation_plot}")
-        
-        # 打印改进效果
-        full_final_ppl = full_val_ppl[-1] if full_val_ppl else float('inf')
-        decoder_final_ppl = decoder_val_ppl[-1] if decoder_val_ppl else float('inf')
-        
-        print(f"\n最终验证困惑度对比:")
-        print(f"完整Transformer: {full_final_ppl:.2f}")
-        print(f"Decoder-Only: {decoder_final_ppl:.2f}")
-        
-    except Exception as e:
-        print(f"生成对比图时出错: {e}")
-    
-    return results
-
 if __name__ == "__main__":
-    # 可以选择训练单个模型或进行消融实验
-    import sys
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'ablation':
-            ablation_study()
-        elif sys.argv[1] == 'decoder_only':
-            train_transformer('decoder_only')
-        else:
-            train_transformer('full')
-    else:
-        print("使用方法:")
-        print("  python train.py ablation     # 消融实验（修复过拟合）")
-        print("  python train.py full         # 完整Transformer（修复过拟合）")
-        print("  python train.py decoder_only # Decoder-Only")
-        print("过拟合修复配置已启用!")
+    print("开始训练Decoder-Only Transformer...")
+    train_decoder_only()
