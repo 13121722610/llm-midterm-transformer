@@ -6,7 +6,7 @@ Course assignment: decoder-only Transformer (Tiny Shakespeare)
 本项目实现了一个完整的Transformer文本生成系统，包含Decoder-Only Transformer架构。通过层数消融实验（2/4/6层对比）和生成质量分析，深入探究Transformer架构设计对文本生成性能的影响。项目使用Tiny Shakespeare数据集进行训练和评估。
 
 # 🎯 核心特性
-Decoder-Only架构: 优化的自回归文本生成模型。
+Decoder-Only架构: 优化的自回归文本生成模型  
 智能采样策略: Top-k + Top-p 混合采样，提升生成多样性  
 层数消融实验: 系统分析不同层数架构的性能差异  
 完整实验流程: 一键复现训练、评估、生成全流程  
