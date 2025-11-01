@@ -1,0 +1,2 @@
+model_type,final_train_loss,final_val_loss,final_train_ppl,final_val_ppl,best_val_loss,best_val_ppl,total_epochs,parameters,timestamp
+decoder_only_improved,0.7784204970276394,1.9602322867713213,2.178029343339408,7.10097633646369,1.5452488906394481,4.68913856449186,5,6420033,2025-10-29 22:27:58
