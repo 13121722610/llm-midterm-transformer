@@ -20,7 +20,7 @@ conda activate llm_toy
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118  
 pip install numpy tqdm matplotlib requests pandas  
 
-一键运行完整实验：  
+【一键运行完整实验】：  
 赋予执行权限  
 chmod +x run.sh  
 运行完整实验流程  
@@ -78,24 +78,22 @@ Decoder-Only Transformer
 目录结构：
 llm-midterm-transformer/  
 ├── 📂 src/                           # 源代码目录  
-│   ├── 📂 checkpoints/              # 模型权重存储  
-│   │   ├── decoder_only_best.pt                    # 基础6层模型 (5轮训练)  
-│   │   ├── decoder_only_improved_best.pt          # 改进版6层模型  
-│   │   ├── ablation_layers_2_best.pt              # 2层消融实验模型  
-│   │   ├── ablation_layers_4_best.pt              # 4层消融实验模型  
-│   │   └── ablation_layers_6_best.pt              # 6层消融实验模型  
+│   ├── 📂 checkpoints/              # 模型权重存储   
+│   │   ├── decoder_only_improved_best.pt          # 6层5轮模型  
+│   │   ├── ablation_layers_2_best.pt              # 2层3轮消融实验模型  
+│   │   ├── ablation_layers_4_best.pt              # 4层3轮消融实验模型  
+│   │   └── ablation_layers_6_best.pt              # 6层3轮消融实验模型  
 │   ├── 📂 results/                  # 实验结果输出  
 │   │   ├── 📂 figures/              # 可视化图表  
-│   │   │   ├── decoder_only_final_training_curve.png          # 完整训练曲线  
+│   │   │   ├── decoder_only_improved_final_training_curve.png          # 完整训练曲线  
 │   │   │   ├── layer_ablation_comparison.png                  # 消融实验中⽂图表  
 │   │   │   └── layer_ablation_comparison_english.png          # 消融实验英⽂图表  
 │   │   ├── 📂 tables/               # 数据表格  
-│   │   │   ├── decoder_only_final_results.csv                 # 6层模型最终结果  
+│   │   │   ├── decoder_only_improved_final_results.csv                 # 6层模型最终结果  
 │   │   │   ├── layer_ablation_results.csv                     # 消融实验数据  
 │   │   │   └── generation_comparison.csv                      # ⽣成对⽐结果  
 │   │   └── 📂 logs/                 # 训练⽇志  
-│   │       ├── decoder_only_log.json                          # 6层模型训练⽇志  
-│   │       └── training_log.json                              # 通⽤训练⽇志  
+│   │       ├── decoder_only_improved_log.json                          # 6层模型训练⽇志  
 │   ├── data.py                      # 数据加载与预处理  
 │   ├── model.py                     # Transformer模型定义  
 │   ├── train.py                     # 模型训练脚本  
