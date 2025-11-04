@@ -20,13 +20,14 @@ conda activate llm_toy
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118  
 pip install numpy tqdm matplotlib requests pandas  
 
-【一键运行完整实验】：  
+【运行方法】：
+一键运行完整实验：  
 赋予执行权限  
 chmod +x run.sh  
 运行完整实验流程  
 ./run.sh  
 
-分步执行：  
+或者分步执行：  
 1、数据准备  
 cd src  
 python -c "from data import load_data; tokenizer, train_data, val_data = load_data()"  
