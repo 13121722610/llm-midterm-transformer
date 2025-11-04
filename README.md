@@ -20,7 +20,7 @@ conda activate llm_toy
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118  
 pip install numpy tqdm matplotlib requests pandas  
 
-【运行方法】：
+# 💻 运行方法
 一键运行完整实验：  
 赋予执行权限  
 chmod +x run.sh  
