@@ -17,7 +17,9 @@ echo ""
 
 # ============================ 参数配置 ============================
 SEED=42
-PROJECT_DIR="/data0/yhji/llm-midterm-transformer"
+# 使用相对路径，确保在任何地方都能正确运行
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"  # 脚本所在目录
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"        # 项目根目录
 PYTHON_PATH="$PROJECT_DIR/src"
 GPU_ID="3"  # 指定使用GPU 3
 
@@ -65,11 +67,11 @@ export PYTHONHASHSEED=$SEED
 # 检查并显示现有目录
 echo "项目目录结构:"
 for dir in "checkpoints" "results" "data"; do
-    if [ -d "$PROJECT_DIR/$dir" ]; then
-        echo "✅ $PROJECT_DIR/$dir/ (已存在)"
+    if [ -d "$PROJECT_DIR/src/$dir" ]; then
+        echo "✅ $PROJECT_DIR/src/$dir/ (已存在)"
     else
-        echo "📁 创建目录: $PROJECT_DIR/$dir/"
-        mkdir -p "$PROJECT_DIR/$dir"
+        echo "📁 创建目录: $PROJECT_DIR/src/$dir/"
+        mkdir -p "$PROJECT_DIR/src/$dir"
     fi
 done
 
