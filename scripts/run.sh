@@ -181,19 +181,21 @@ fi
 echo ""
 echo "=== 步骤8: 生成对比测试 ==="
 
-# 检查是否已有生成对比结果
-if [ -f "$PROJECT_DIR/src/results/tables/generation_comparison.csv" ]; then
+# 检查是否已有生成对比结果，但强制重新运行
+if [ -f "$PROJECT_DIR/src/results/tables/generation_comparison.csv" ] && [ "$1" != "--force" ]; then
     echo "✅ 生成对比已完成，跳过此步骤"
     echo "📝 生成对比样本:"
     python -c "
 import pandas as pd
 try:
     df = pd.read_csv('results/tables/generation_comparison.csv')
-    sample = df[df['prompt']=='To be, or not to be'].head(1)
-    if not sample.empty:
-        model = sample['model'].iloc[0]
-        text = sample['generated_text'].iloc[0]
-        print(f'{model}: {text[:50]}...')
+    # 显示所有模型的样本
+    for model in df['model'].unique():
+        sample = df[df['model']==model].head(1)
+        if not sample.empty:
+            prompt = sample['prompt'].iloc[0]
+            text = sample['generated_text'].iloc[0]
+            print(f'{model}: {text[:50]}...')
 except:
     print('无法读取生成对比结果')
 "
