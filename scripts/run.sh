@@ -181,135 +181,16 @@ fi
 echo ""
 echo "=== 步骤8: 生成对比测试 ==="
 
-# 检查是否已有生成对比结果，但强制重新运行
-if [ -f "$PROJECT_DIR/src/results/tables/generation_comparison.csv" ] && [ "$1" != "--force" ]; then
-    echo "✅ 生成对比已完成，跳过此步骤"
-    echo "📝 生成对比样本:"
-    python -c "
-import pandas as pd
-try:
-    df = pd.read_csv('results/tables/generation_comparison.csv')
-    # 显示所有模型的样本
-    for model in df['model'].unique():
-        sample = df[df['model']==model].head(1)
-        if not sample.empty:
-            prompt = sample['prompt'].iloc[0]
-            text = sample['generated_text'].iloc[0]
-            print(f'{model}: {text[:50]}...')
-except:
-    print('无法读取生成对比结果')
-"
-else
-    echo "开始模型生成对比测试..."
-    
-    # 创建生成对比脚本
-    cat > compare_generation.py << 'EOF'
-import torch
-import pandas as pd
-from data import load_data
-from model import DecoderOnlyTransformer
-
-def generate_text(model, tokenizer, prompt, max_new_tokens=50, temperature=0.8, top_k=20, top_p=0.9):
-    model.eval()
-    device = next(model.parameters()).device
-    idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long).to(device)
-    
-    for _ in range(max_new_tokens):
-        idx_cond = idx if idx.size(1) <= 256 else idx[:, -256:]
-        logits = model(idx_cond)
-        logits = logits[:, -1, :] / temperature
-        
-        if top_k is not None and top_k > 0:
-            v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-            logits[logits < v[:, [-1]]] = -float('Inf')
-        
-        if top_p is not None and top_p < 1.0:
-            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-            cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
-            sorted_indices_to_remove = cumulative_probs > top_p
-            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-            sorted_indices_to_remove[..., 0] = 0
-            indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-            logits[indices_to_remove] = -float('Inf')
-        
-        probs = torch.softmax(logits, dim=-1)
-        if torch.all(probs == 0):
-            probs = torch.ones_like(probs) / probs.size(-1)
-        next_id = torch.multinomial(probs, num_samples=1)
-        idx = torch.cat([idx, next_id], dim=1)
-    
-    return tokenizer.decode(idx[0].tolist())
-
-def compare_models_generation():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer, _, _ = load_data()
-    
-    model_configs = [
-        {'layers': 2, 'path': 'checkpoints/ablation_layers_2_best.pt', 'name': '2层模型'},
-        {'layers': 4, 'path': 'checkpoints/ablation_layers_4_best.pt', 'name': '4层模型'},
-        {'layers': 6, 'path': 'checkpoints/ablation_layers_6_best.pt', 'name': '6层模型(3轮)'},
-        {'layers': 6, 'path': 'checkpoints/decoder_only_improved_best.pt', 'name': '6层模型(5轮)'}
-    ]
-    
-    test_prompts = [
-        "To be, or not to be",
-        "Once upon a time", 
-        "The future of AI",
-        "Love is",
-        "In the beginning"
-    ]
-    
-    results = []
-    
-    print("🎯 消融实验模型生成对比分析")
-    print("=" * 70)
-    
-    for config in model_configs:
-        print(f"\n🧪 {config['name']} ({config['layers']}层)")
-        print("-" * 50)
-        
-        try:
-            model = DecoderOnlyTransformer(
-                vocab_size=tokenizer.vocab_size,
-                d_model=256,
-                n_layer=config['layers'],
-                n_head=8,
-                d_ff=1024,
-                max_seq_len=256,
-                dropout=0.1
-            ).to(device)
-            
-            model.load_state_dict(torch.load(config['path'], map_location=device, weights_only=False))
-            
-            for prompt in test_prompts:
-                generated = generate_text(model, tokenizer, prompt, max_new_tokens=30)
-                print(f"📝 '{prompt}'")
-                print(f"   → {generated}")
-                
-                results.append({
-                    'model': config['name'],
-                    'layers': config['layers'], 
-                    'prompt': prompt,
-                    'generated_text': generated
-                })
-            
-            del model
-            torch.cuda.empty_cache()
-            
-        except Exception as e:
-            print(f"❌ 加载失败: {e}")
-    
-    results_df = pd.DataFrame(results)
-    results_df.to_csv('results/tables/generation_comparison.csv', index=False)
-    print(f"\n✅ 生成对比完成! 结果保存至: results/tables/generation_comparison.csv")
-
-if __name__ == "__main__":
-    compare_models_generation()
-EOF
-
-    CUDA_VISIBLE_DEVICES=$GPU_ID python compare_generation.py
-    rm compare_generation.py  # 清理临时文件
+# 自动删除旧的生成对比文件，确保每次运行都重新生成
+if [ -f "$PROJECT_DIR/src/results/tables/generation_comparison.csv" ]; then
+    echo "🗑️ 删除旧的生成对比文件，重新生成..."
+    rm -f "$PROJECT_DIR/src/results/tables/generation_comparison.csv"
 fi
+
+echo "开始模型生成对比测试..."
+
+# 直接使用你写好的 compare_generation.py 文件
+CUDA_VISIBLE_DEVICES=$GPU_ID python compare_generation.py
 
 # ============================ 基础生成测试 ============================
 echo ""
